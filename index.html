@@ -63,10 +63,34 @@ input[type=date]{
   border:0;background:var(--sage-soft);color:#657062;padding:9px 12px;border-radius:13px;font-size:12px;font-weight:800;
 }
 
+
 .weatherCard{
   margin-top:9px;padding:12px 13px;background:linear-gradient(145deg,#fffdf9,var(--sage-soft));
   border:1px solid #dde5d9;border-radius:18px;box-shadow:0 7px 18px rgba(88,85,76,.05)
 }
+.weatherLocationRow{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px;margin-bottom:10px
+}
+.weatherLocationInput{
+  width:100%;border:1px solid rgba(158,175,153,.35);background:rgba(255,255,255,.78);
+  border-radius:12px;padding:9px 10px;font-size:12px;color:var(--ink);outline:none
+}
+.weatherSearchBtn{
+  border:0;background:var(--sage);color:#596654;border-radius:12px;padding:8px 11px;
+  font-size:11px;font-weight:850;cursor:pointer
+}
+.placeResults{
+  display:none;margin:-4px 0 10px;background:#fff;border:1px solid var(--line);
+  border-radius:13px;overflow:hidden;box-shadow:0 8px 18px rgba(78,72,66,.07)
+}
+.placeResults.show{display:block}
+.placeResult{
+  width:100%;border:0;border-bottom:1px solid #eee8e1;background:#fff;text-align:left;
+  padding:9px 10px;color:var(--ink);cursor:pointer
+}
+.placeResult:last-child{border-bottom:0}
+.placeResultMain{font-size:12px;font-weight:800}
+.placeResultSub{font-size:10px;color:var(--muted);margin-top:2px}
 .weatherTop{display:flex;align-items:center;gap:10px}
 .weatherIcon{font-size:28px;line-height:1;flex:0 0 auto}
 .weatherInfo{flex:1}
@@ -83,6 +107,18 @@ input[type=date]{
   border-radius:10px;padding:5px 8px;font-size:10px;font-weight:800;cursor:pointer
 }
 .weatherLoading{opacity:.7}
+.hourlyWeather{
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-top:10px
+}
+.hourlyItem{
+  background:rgba(255,255,255,.62);border:1px solid rgba(158,175,153,.2);
+  border-radius:13px;padding:8px 4px;text-align:center
+}
+.hourlyLabel{font-size:10px;font-weight:850;color:#687064}
+.hourlyClock{font-size:9px;color:var(--muted);margin-top:1px}
+.hourlyIcon{font-size:20px;line-height:1.2;margin:4px 0 2px}
+.hourlyTemp{font-size:11px;font-weight:850}
+.hourlyRain{font-size:9px;color:#737a70;margin-top:2px}
 
 .card{
   background:rgba(255,253,249,.95);border:1px solid rgba(232,225,216,.95);
@@ -252,21 +288,37 @@ input[type=file]{display:none}
       </div>
     </div>
 
+
     <div class="weatherCard" id="weatherCard">
+      <div class="weatherLocationRow">
+        <input class="weatherLocationInput" id="placeSearch" type="text" placeholder="地域を入力　例：盛岡市">
+        <button class="weatherSearchBtn" id="placeSearchBtn">地域を選ぶ</button>
+      </div>
+      <div class="placeResults" id="placeResults"></div>
+
       <div class="weatherTop">
         <div class="weatherIcon" id="weatherIcon">🌤️</div>
         <div class="weatherInfo">
-          <div class="weatherTitle" id="weatherTitle">天気を取得中…</div>
-          <div class="weatherPlace" id="weatherPlace">現在地</div>
+          <div class="weatherTitle" id="weatherTitle">地域を選んでね</div>
+          <div class="weatherPlace" id="weatherPlace">天気を表示する地域を検索できます</div>
         </div>
         <div class="weatherTemps" id="weatherTemps">--° / --°</div>
       </div>
+
       <div class="weatherBottom">
         <span id="weatherRain">☔ --%</span>
         <span id="weatherSunset">🌇 --:--</span>
         <button class="weatherRetry" id="weatherRetry">↻ 更新</button>
       </div>
+
+      <div class="hourlyWeather" id="hourlyWeather">
+        <div class="hourlyItem"><div class="hourlyLabel">朝</div><div class="hourlyIcon">—</div></div>
+        <div class="hourlyItem"><div class="hourlyLabel">昼</div><div class="hourlyIcon">—</div></div>
+        <div class="hourlyItem"><div class="hourlyLabel">夕方</div><div class="hourlyIcon">—</div></div>
+        <div class="hourlyItem"><div class="hourlyLabel">夜</div><div class="hourlyIcon">—</div></div>
+      </div>
     </div>
+
   </div>
 
   <div class="card hero">
@@ -432,7 +484,10 @@ function saveDays(x){localStorage.setItem("babyPlannerDays",JSON.stringify(x))}
 function globals(){return JSON.parse(localStorage.getItem("babyPlannerTaskDefaults")||"null")}
 function saveGlobals(x){localStorage.setItem("babyPlannerTaskDefaults",JSON.stringify(x))}
 function settings(){return JSON.parse(localStorage.getItem("babyPlannerSettings")||'{"milkIntervalMins":180}')}
-function saveSettings(x){localStorage.setItem("babyPlannerSettings",JSON.stringify(x))}
+function saveSettings(x){
+  const cur=JSON.parse(localStorage.getItem("babyPlannerSettings")||"{}");
+  localStorage.setItem("babyPlannerSettings",JSON.stringify({...cur,...x}));
+}
 
 function freshTasks(){
   const g=globals();
@@ -481,7 +536,10 @@ function renderAll(){
   $("#selectedDate").value=selectedDate;$("#scheduleDateLabel").textContent=humanDate(selectedDate);
   $("#wakeTime").value=state.wakeTime||"";$("#homeTime").value=state.homeTime||"19:00";$("#milkInterval").value=String(state.milkIntervalMins||180);
   $("#prepMins").value=state.prepMins??60;$("#shopMins").value=state.shopMins??60;
-  renderTasks();renderMemos();renderSchedule(state.schedule||[]);renderCelebration();renderSunsetInfo();renderWeather();setTimeout(()=>refreshWeatherForSelectedDate(false),0);
+  renderTasks();renderMemos();renderSchedule(state.schedule||[]);renderCelebration();renderSunsetInfo();
+  const savedLoc=getWeatherLocation();
+  if($("#placeSearch"))$("#placeSearch").value=savedLoc?weatherLocationLabel(savedLoc):"";
+  renderWeather();setTimeout(()=>refreshWeatherForSelectedDate(false),0);
 }
 
 function renderTasks(){
@@ -546,6 +604,7 @@ function deser(e){return {...e,start:new Date(e.start),end:e.end?new Date(e.end)
 
 
 
+
 function weatherLabel(code){
   const c=Number(code);
   if(c===0)return {icon:"☀️",text:"晴れ"};
@@ -568,8 +627,44 @@ function weatherDateDiff(){
   return Math.round((b-a)/86400000);
 }
 
+function getWeatherLocation(){
+  return settings().weatherLocation||null;
+}
+
+function weatherLocationLabel(loc){
+  if(!loc)return "";
+  return [loc.name,loc.admin1].filter(Boolean).join("・");
+}
+
+function renderHourlyWeather(periods=[]){
+  const box=$("#hourlyWeather");
+  if(!box)return;
+  const defaults=[
+    {label:"朝",hour:"8:00"},
+    {label:"昼",hour:"12:00"},
+    {label:"夕方",hour:"16:00"},
+    {label:"夜",hour:"20:00"}
+  ];
+  box.innerHTML="";
+  defaults.forEach((d,i)=>{
+    const p=periods[i];
+    const info=p?weatherLabel(p.code):{icon:"—",text:""};
+    const item=document.createElement("div");
+    item.className="hourlyItem";
+    item.innerHTML=`
+      <div class="hourlyLabel">${d.label}</div>
+      <div class="hourlyClock">${p?.time||d.hour}</div>
+      <div class="hourlyIcon">${info.icon}</div>
+      <div class="hourlyTemp">${p?`${Math.round(p.temp)}°`:"--°"}</div>
+      <div class="hourlyRain">${p?`☔ ${p.rain ?? "--"}%`:"☔ --%"}</div>
+    `;
+    box.appendChild(item);
+  });
+}
+
 function renderWeather(){
   const w=state.weather;
+  const loc=getWeatherLocation();
   const card=$("#weatherCard");
   if(!card)return;
 
@@ -579,32 +674,120 @@ function renderWeather(){
     const info=weatherLabel(w.code);
     $("#weatherIcon").textContent=info.icon;
     $("#weatherTitle").textContent=info.text;
-    $("#weatherPlace").textContent=w.place||"現在地";
+    $("#weatherPlace").textContent=w.place||weatherLocationLabel(loc)||"選択した地域";
     $("#weatherTemps").textContent=`${Math.round(w.max)}° / ${Math.round(w.min)}°`;
     $("#weatherRain").textContent=`☔ ${w.rain ?? "--"}%`;
     $("#weatherSunset").textContent=`🌇 ${w.sunset||"--:--"}`;
+    renderHourlyWeather(w.periods||[]);
     return;
   }
 
   const diff=weatherDateDiff();
+
+  if(!loc){
+    $("#weatherIcon").textContent="📍";
+    $("#weatherTitle").textContent="地域を選んでね";
+    $("#weatherPlace").textContent="市区町村名を検索すると天気を表示";
+    $("#weatherTemps").textContent="--° / --°";
+    $("#weatherRain").textContent="☔ --%";
+    $("#weatherSunset").textContent=`🌇 ${state.sunsetTime||"--:--"}`;
+    renderHourlyWeather([]);
+    return;
+  }
+
   $("#weatherIcon").textContent=diff<0?"📅":"🌤️";
   $("#weatherTitle").textContent=diff<0?"この日の天気は未保存":"天気を取得中…";
-  $("#weatherPlace").textContent=diff<0?"当日に取得すると履歴に残るよ":"位置情報を使用";
+  $("#weatherPlace").textContent=weatherLocationLabel(loc);
   $("#weatherTemps").textContent="--° / --°";
   $("#weatherRain").textContent="☔ --%";
   $("#weatherSunset").textContent=`🌇 ${state.sunsetTime||"--:--"}`;
+  renderHourlyWeather([]);
   if(diff>=0)card.classList.add("weatherLoading");
 }
 
-async function fetchWeatherAt(lat,lon){
+async function searchPlaces(){
+  const q=$("#placeSearch").value.trim();
+  if(!q){showStatus("地域名を入力してね");return;}
+
+  const results=$("#placeResults");
+  results.innerHTML='<button class="placeResult"><div class="placeResultMain">検索中…</div></button>';
+  results.classList.add("show");
+
+  try{
+    const params=new URLSearchParams({name:q,count:"8",language:"ja",format:"json"});
+    const res=await fetch(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`);
+    if(!res.ok)throw new Error("place");
+    const data=await res.json();
+    const list=(data.results||[]).filter(x=>Number.isFinite(x.latitude)&&Number.isFinite(x.longitude));
+
+    if(!list.length){
+      results.innerHTML='<button class="placeResult"><div class="placeResultMain">候補が見つからなかったよ</div><div class="placeResultSub">市区町村名を変えて検索してみてね</div></button>';
+      return;
+    }
+
+    results.innerHTML="";
+    list.forEach(x=>{
+      const btn=document.createElement("button");
+      btn.className="placeResult";
+      const sub=[x.admin1,x.country].filter(Boolean).join("・");
+      btn.innerHTML=`<div class="placeResultMain">${esc(x.name||q)}</div><div class="placeResultSub">${esc(sub)}</div>`;
+      btn.addEventListener("click",()=>{
+        const loc={
+          name:x.name||q,
+          admin1:x.admin1||"",
+          country:x.country||"",
+          latitude:Number(x.latitude),
+          longitude:Number(x.longitude),
+          timezone:x.timezone||"auto"
+        };
+        saveSettings({weatherLocation:loc});
+        $("#placeSearch").value=weatherLocationLabel(loc);
+        results.classList.remove("show");
+        state.weather=null;
+        state.sunsetTime="18:00";
+        state.sunsetAuto=false;
+        saveDay();
+        renderWeather();
+        refreshWeatherForSelectedDate(true);
+        showStatus(`${weatherLocationLabel(loc)} に設定したよ`);
+      });
+      results.appendChild(btn);
+    });
+  }catch{
+    results.innerHTML='<button class="placeResult"><div class="placeResultMain">地域検索に失敗したよ</div><div class="placeResultSub">少し待ってもう一度試してね</div></button>';
+  }
+}
+
+function pickHourly(data,label,hour){
+  const target=`${selectedDate}T${String(hour).padStart(2,"0")}:00`;
+  const times=data.hourly?.time||[];
+  let idx=times.indexOf(target);
+
+  if(idx<0){
+    idx=times.findIndex(t=>t.startsWith(`${selectedDate}T${String(hour).padStart(2,"0")}`));
+  }
+  if(idx<0)return null;
+
+  return {
+    label,
+    time:`${String(hour).padStart(2,"0")}:00`,
+    code:data.hourly.weather_code?.[idx] ?? 0,
+    temp:data.hourly.temperature_2m?.[idx] ?? 0,
+    rain:data.hourly.precipitation_probability?.[idx] ?? 0
+  };
+}
+
+async function fetchWeatherForPlace(loc){
   const params=new URLSearchParams({
-    latitude:String(lat),
-    longitude:String(lon),
+    latitude:String(loc.latitude),
+    longitude:String(loc.longitude),
     daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunset",
-    timezone:"auto",
+    hourly:"weather_code,temperature_2m,precipitation_probability",
+    timezone:loc.timezone||"auto",
     start_date:selectedDate,
     end_date:selectedDate
   });
+
   const res=await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
   if(!res.ok)throw new Error("weather");
   const data=await res.json();
@@ -612,7 +795,16 @@ async function fetchWeatherAt(lat,lon){
   if(!d?.time?.length)throw new Error("weather");
 
   const sunsetRaw=d.sunset?.[0]||"";
-  const sunset=sunsetRaw.includes("T")?sunsetRaw.split("T")[1].slice(0,5):(state.sunsetTime||"18:00");
+  const sunset=sunsetRaw.includes("T")
+    ? sunsetRaw.split("T")[1].slice(0,5)
+    : (state.sunsetTime||"18:00");
+
+  const periods=[
+    pickHourly(data,"朝",8),
+    pickHourly(data,"昼",12),
+    pickHourly(data,"夕方",16),
+    pickHourly(data,"夜",20)
+  ];
 
   state.weather={
     date:selectedDate,
@@ -621,11 +813,17 @@ async function fetchWeatherAt(lat,lon){
     min:d.temperature_2m_min?.[0] ?? 0,
     rain:d.precipitation_probability_max?.[0] ?? 0,
     sunset,
-    place:"現在地",
+    periods,
+    place:weatherLocationLabel(loc),
+    location:{
+      name:loc.name,
+      admin1:loc.admin1,
+      latitude:loc.latitude,
+      longitude:loc.longitude
+    },
     fetchedAt:new Date().toISOString()
   };
 
-  // Use the forecast API's sunset for walk scheduling too.
   state.sunsetTime=sunset;
   state.sunsetAuto=true;
   saveDay();
@@ -635,58 +833,51 @@ async function fetchWeatherAt(lat,lon){
 
 function refreshWeatherForSelectedDate(force=false){
   const diff=weatherDateDiff();
+  const loc=getWeatherLocation();
 
-  // Keep previously saved weather for past days.
+  if(!loc){
+    renderWeather();
+    return;
+  }
+
+  // Past days: keep stored weather only.
   if(diff<0){
     renderWeather();
     return;
   }
 
-  // Open-Meteo forecast horizon is up to 16 days.
   if(diff>16){
     $("#weatherCard")?.classList.remove("weatherLoading");
     $("#weatherIcon").textContent="📅";
     $("#weatherTitle").textContent="まだ予報期間外";
-    $("#weatherPlace").textContent="16日以内になると表示できるよ";
+    $("#weatherPlace").textContent=weatherLocationLabel(loc);
     $("#weatherTemps").textContent="--° / --°";
     $("#weatherRain").textContent="☔ --%";
     $("#weatherSunset").textContent=`🌇 ${state.sunsetTime||"--:--"}`;
+    renderHourlyWeather([]);
     return;
   }
 
-  // Avoid needless reloads unless user asked for refresh.
-  if(!force && state.weather?.date===selectedDate){
+  const samePlace=
+    state.weather?.location &&
+    Number(state.weather.location.latitude)===Number(loc.latitude) &&
+    Number(state.weather.location.longitude)===Number(loc.longitude);
+
+  if(!force && state.weather?.date===selectedDate && samePlace){
     renderWeather();
     return;
   }
 
   renderWeather();
 
-  if(!navigator.geolocation){
+  fetchWeatherForPlace(loc).catch(()=>{
     $("#weatherCard")?.classList.remove("weatherLoading");
-    $("#weatherTitle").textContent="位置情報を使えません";
-    $("#weatherPlace").textContent="この端末では現在地を取得できません";
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    pos=>{
-      fetchWeatherAt(pos.coords.latitude,pos.coords.longitude).catch(()=>{
-        $("#weatherCard")?.classList.remove("weatherLoading");
-        $("#weatherTitle").textContent="天気を取得できなかったよ";
-        $("#weatherPlace").textContent="↻ 更新でもう一度試せるよ";
-      });
-    },
-    ()=>{
-      $("#weatherCard")?.classList.remove("weatherLoading");
-      $("#weatherIcon").textContent="📍";
-      $("#weatherTitle").textContent="位置情報を許可すると表示";
-      $("#weatherPlace").textContent="Safariの位置情報をONにしてね";
-      $("#weatherTemps").textContent="--° / --°";
-      $("#weatherRain").textContent="☔ --%";
-    },
-    {enableHighAccuracy:false,timeout:7000,maximumAge:600000}
-  );
+    $("#weatherIcon").textContent="☁️";
+    $("#weatherTitle").textContent="天気を取得できなかったよ";
+    $("#weatherPlace").textContent=weatherLocationLabel(loc);
+    $("#weatherTemps").textContent="--° / --°";
+    renderHourlyWeather([]);
+  });
 }
 
 function deg2rad(d){return d*Math.PI/180}
@@ -735,22 +926,9 @@ function renderSunsetInfo(){
 function updateSunsetForSelectedDate(){
   const walk=state.tasks?.find(t=>t.walk);
   if(!walk?.selected){renderSunsetInfo();return;}
-  if(!navigator.geolocation){
-    state.sunsetTime=state.sunsetTime||"18:00";state.sunsetAuto=false;saveDay();renderSunsetInfo();return;
-  }
-  navigator.geolocation.getCurrentPosition(
-    pos=>{
-      const t=calcSunsetLocal(selectedDate,pos.coords.latitude,pos.coords.longitude);
-      if(t){state.sunsetTime=t;state.sunsetAuto=true;saveDay();}
-      renderSunsetInfo();
-    },
-    ()=>{
-      state.sunsetTime=state.sunsetTime||"18:00";state.sunsetAuto=false;saveDay();renderSunsetInfo();
-    },
-    {enableHighAccuracy:false,timeout:5000,maximumAge:86400000}
-  );
+  refreshWeatherForSelectedDate(false);
+  renderSunsetInfo();
 }
-
 function buildSchedule(forceStart=null,fromNow=false){
   const wake=atDate($("#wakeTime").value),home=atDate($("#homeTime").value);
   if(!wake||!home){showStatus("時間を入れてね");return}
@@ -864,6 +1042,11 @@ function renderSchedule(schedule){
 $("#selectedDate").addEventListener("change",e=>loadDay(e.target.value));
 $("#todayBtn").addEventListener("click",()=>loadDay(fmtDate(new Date())));
 $("#weatherRetry").addEventListener("click",()=>refreshWeatherForSelectedDate(true));
+$("#placeSearchBtn").addEventListener("click",searchPlaces);
+$("#placeSearch").addEventListener("keydown",e=>{
+  if(e.key==="Enter"){e.preventDefault();searchPlaces();}
+});
+
 ["wakeTime","homeTime","milkInterval","prepMins","shopMins"].forEach(id=>$("#"+id).addEventListener("change",saveDay));
 
 $("#wakeNow").addEventListener("click",()=>{
