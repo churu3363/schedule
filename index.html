@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#f7f3ee" />
 <title>ベビの1日</title>
-<link rel="icon" type="image/png" href="icon.png">
-<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -62,6 +62,28 @@ input[type=date]{
 .todayBtn{
   border:0;background:var(--sage-soft);color:#657062;padding:9px 12px;border-radius:13px;font-size:12px;font-weight:800;
 }
+
+.weatherCard{
+  margin-top:9px;padding:12px 13px;background:linear-gradient(145deg,#fffdf9,var(--sage-soft));
+  border:1px solid #dde5d9;border-radius:18px;box-shadow:0 7px 18px rgba(88,85,76,.05)
+}
+.weatherTop{display:flex;align-items:center;gap:10px}
+.weatherIcon{font-size:28px;line-height:1;flex:0 0 auto}
+.weatherInfo{flex:1}
+.weatherTitle{font-size:13px;font-weight:850;line-height:1.3}
+.weatherPlace{font-size:10px;color:var(--muted);margin-top:2px}
+.weatherTemps{font-size:14px;font-weight:850;white-space:nowrap}
+.weatherBottom{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:8px;
+  padding-top:8px;border-top:1px solid rgba(157,175,153,.22);
+  font-size:11px;color:#6f736c
+}
+.weatherRetry{
+  margin-left:auto;border:0;background:rgba(255,255,255,.68);color:#687164;
+  border-radius:10px;padding:5px 8px;font-size:10px;font-weight:800;cursor:pointer
+}
+.weatherLoading{opacity:.7}
+
 .card{
   background:rgba(255,253,249,.95);border:1px solid rgba(232,225,216,.95);
   border-radius:24px;padding:17px;margin:0 0 14px;box-shadow:var(--shadow)
@@ -229,6 +251,22 @@ input[type=file]{display:none}
         <button class="todayBtn" id="todayBtn">今日</button>
       </div>
     </div>
+
+    <div class="weatherCard" id="weatherCard">
+      <div class="weatherTop">
+        <div class="weatherIcon" id="weatherIcon">🌤️</div>
+        <div class="weatherInfo">
+          <div class="weatherTitle" id="weatherTitle">天気を取得中…</div>
+          <div class="weatherPlace" id="weatherPlace">現在地</div>
+        </div>
+        <div class="weatherTemps" id="weatherTemps">--° / --°</div>
+      </div>
+      <div class="weatherBottom">
+        <span id="weatherRain">☔ --%</span>
+        <span id="weatherSunset">🌇 --:--</span>
+        <button class="weatherRetry" id="weatherRetry">↻ 更新</button>
+      </div>
+    </div>
   </div>
 
   <div class="card hero">
@@ -282,6 +320,12 @@ input[type=file]{display:none}
           <input type="number" id="shopMins" value="60" min="15" step="5">
         </div>
       </div>
+    </div>
+
+
+    <div id="sunsetInfo" class="info" style="display:none;margin-top:10px">
+      🌇 日没目安 <b id="sunsetTimeLabel">18:00</b>
+      <span id="sunsetSource" style="font-size:10px;color:var(--muted)"></span>
     </div>
 
     <div class="addBox">
@@ -367,6 +411,7 @@ const DEFAULT_TASKS=[
   {id:"dishes",name:"🫧 洗い物",mins:15,selected:true,builtin:true},
   {id:"bath",name:"🛁 自分のお風呂",mins:25,selected:true,builtin:true,late:true,bath:true},
   {id:"cleaning",name:"🧹 掃除",mins:15,selected:true,builtin:true},
+  {id:"walk",name:"🌿 お散歩",mins:30,selected:false,builtin:true,walk:true,late:true},
   {id:"shopping",name:"🛒 買い物",mins:60,selected:false,builtin:true,shopping:true}
 ];
 
@@ -411,13 +456,13 @@ function defaultState(){
   return {
     wakeTime:today?fmtTime(new Date()):"08:00",homeTime:"19:00",
     milkIntervalMins:Number(settings().milkIntervalMins||180),
-    prepMins:60,shopMins:60,tasks:freshTasks(),memos:carryMemos(selectedDate),schedule:[],doneMap:{},sleepAt:null,sleepMessage:"",sleepCelebrationVisible:false
+    prepMins:60,shopMins:60,sunsetTime:"18:00",sunsetAuto:false,tasks:freshTasks(),memos:carryMemos(selectedDate),schedule:[],doneMap:{},weather:null,sleepAt:null,sleepMessage:"",sleepCelebrationVisible:false
   }
 }
 function ensure(){
   state.tasks ||= freshTasks();state.memos ||= [{id:uid("memo"),text:"",checked:false}];
-  state.schedule ||= [];state.doneMap ||= {};state.homeTime ||= "19:00";
-  state.prepMins ??=60;state.shopMins ??=60;state.milkIntervalMins ??=Number(settings().milkIntervalMins||180);state.sleepAt ??=null;state.sleepMessage ??="";state.sleepCelebrationVisible ??=false
+  state.schedule ||= [];state.doneMap ||= {};state.weather ??=null;state.homeTime ||= "19:00";
+  state.prepMins ??=60;state.shopMins ??=60;state.sunsetTime ??="18:00";state.sunsetAuto ??=false;state.milkIntervalMins ??=Number(settings().milkIntervalMins||180);state.sleepAt ??=null;state.sleepMessage ??="";state.sleepCelebrationVisible ??=false
 }
 function loadDay(s){
   selectedDate=s;const d=allDays();state=d[s]?JSON.parse(JSON.stringify(d[s])):defaultState();
@@ -436,7 +481,7 @@ function renderAll(){
   $("#selectedDate").value=selectedDate;$("#scheduleDateLabel").textContent=humanDate(selectedDate);
   $("#wakeTime").value=state.wakeTime||"";$("#homeTime").value=state.homeTime||"19:00";$("#milkInterval").value=String(state.milkIntervalMins||180);
   $("#prepMins").value=state.prepMins??60;$("#shopMins").value=state.shopMins??60;
-  renderTasks();renderMemos();renderSchedule(state.schedule||[]);renderCelebration()
+  renderTasks();renderMemos();renderSchedule(state.schedule||[]);renderCelebration();renderSunsetInfo();renderWeather();setTimeout(()=>refreshWeatherForSelectedDate(false),0);
 }
 
 function renderTasks(){
@@ -447,7 +492,7 @@ function renderTasks(){
     card.innerHTML=`
       <input class="taskCheck" type="checkbox" ${t.selected?"checked":""}>
       <div class="taskMain">
-        <div class="taskName">${esc(t.name)}</div>
+        <div class="taskName">${esc(t.name)}${t.walk?'<small style="display:block;font-size:10px;color:var(--muted);font-weight:500;margin-top:2px">日が沈む前に</small>':""}</div>
         <div class="timeLine">${t.shopping?'<span>準備＋買い物時間は下で設定</span>':`<input type="number" min="5" step="5" value="${t.mins}"><span>分</span>`}</div>
       </div>
       <button class="deleteTask ${t.builtin?"hidden":""}">×</button>
@@ -456,7 +501,7 @@ function renderTasks(){
     chk.addEventListener("change",()=>{
       t.selected=chk.checked;card.classList.toggle("selected",t.selected);
       if(t.shopping)$("#shoppingOptions").classList.toggle("show",t.selected);
-      saveDay()
+      saveDay();renderSunsetInfo();if(t.walk&&t.selected)updateSunsetForSelectedDate()
     });
     const dur=card.querySelector('.timeLine input');
     if(dur)dur.addEventListener("change",()=>{t.mins=Math.max(5,Number(dur.value||5));dur.value=t.mins;saveDay()});
@@ -499,6 +544,213 @@ function milkTimes(start,home,intervalMins){
 function ser(e){return {...e,start:e.start.toISOString(),end:e.end?e.end.toISOString():null}}
 function deser(e){return {...e,start:new Date(e.start),end:e.end?new Date(e.end):null}}
 
+
+
+function weatherLabel(code){
+  const c=Number(code);
+  if(c===0)return {icon:"☀️",text:"晴れ"};
+  if(c===1)return {icon:"🌤️",text:"晴れ"};
+  if(c===2)return {icon:"⛅",text:"晴れ時々くもり"};
+  if(c===3)return {icon:"☁️",text:"くもり"};
+  if(c===45||c===48)return {icon:"🌫️",text:"霧"};
+  if([51,53,55,56,57].includes(c))return {icon:"🌦️",text:"霧雨"};
+  if([61,63,65,66,67].includes(c))return {icon:"🌧️",text:"雨"};
+  if([71,73,75,77].includes(c))return {icon:"🌨️",text:"雪"};
+  if([80,81,82].includes(c))return {icon:"🌦️",text:"にわか雨"};
+  if([85,86].includes(c))return {icon:"🌨️",text:"にわか雪"};
+  if([95,96,99].includes(c))return {icon:"⛈️",text:"雷雨"};
+  return {icon:"🌤️",text:"天気"};
+}
+
+function weatherDateDiff(){
+  const a=parseDate(fmtDate(new Date()));
+  const b=parseDate(selectedDate);
+  return Math.round((b-a)/86400000);
+}
+
+function renderWeather(){
+  const w=state.weather;
+  const card=$("#weatherCard");
+  if(!card)return;
+
+  card.classList.remove("weatherLoading");
+
+  if(w && w.date===selectedDate){
+    const info=weatherLabel(w.code);
+    $("#weatherIcon").textContent=info.icon;
+    $("#weatherTitle").textContent=info.text;
+    $("#weatherPlace").textContent=w.place||"現在地";
+    $("#weatherTemps").textContent=`${Math.round(w.max)}° / ${Math.round(w.min)}°`;
+    $("#weatherRain").textContent=`☔ ${w.rain ?? "--"}%`;
+    $("#weatherSunset").textContent=`🌇 ${w.sunset||"--:--"}`;
+    return;
+  }
+
+  const diff=weatherDateDiff();
+  $("#weatherIcon").textContent=diff<0?"📅":"🌤️";
+  $("#weatherTitle").textContent=diff<0?"この日の天気は未保存":"天気を取得中…";
+  $("#weatherPlace").textContent=diff<0?"当日に取得すると履歴に残るよ":"位置情報を使用";
+  $("#weatherTemps").textContent="--° / --°";
+  $("#weatherRain").textContent="☔ --%";
+  $("#weatherSunset").textContent=`🌇 ${state.sunsetTime||"--:--"}`;
+  if(diff>=0)card.classList.add("weatherLoading");
+}
+
+async function fetchWeatherAt(lat,lon){
+  const params=new URLSearchParams({
+    latitude:String(lat),
+    longitude:String(lon),
+    daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunset",
+    timezone:"auto",
+    start_date:selectedDate,
+    end_date:selectedDate
+  });
+  const res=await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
+  if(!res.ok)throw new Error("weather");
+  const data=await res.json();
+  const d=data.daily;
+  if(!d?.time?.length)throw new Error("weather");
+
+  const sunsetRaw=d.sunset?.[0]||"";
+  const sunset=sunsetRaw.includes("T")?sunsetRaw.split("T")[1].slice(0,5):(state.sunsetTime||"18:00");
+
+  state.weather={
+    date:selectedDate,
+    code:d.weather_code?.[0] ?? 0,
+    max:d.temperature_2m_max?.[0] ?? 0,
+    min:d.temperature_2m_min?.[0] ?? 0,
+    rain:d.precipitation_probability_max?.[0] ?? 0,
+    sunset,
+    place:"現在地",
+    fetchedAt:new Date().toISOString()
+  };
+
+  // Use the forecast API's sunset for walk scheduling too.
+  state.sunsetTime=sunset;
+  state.sunsetAuto=true;
+  saveDay();
+  renderWeather();
+  renderSunsetInfo();
+}
+
+function refreshWeatherForSelectedDate(force=false){
+  const diff=weatherDateDiff();
+
+  // Keep previously saved weather for past days.
+  if(diff<0){
+    renderWeather();
+    return;
+  }
+
+  // Open-Meteo forecast horizon is up to 16 days.
+  if(diff>16){
+    $("#weatherCard")?.classList.remove("weatherLoading");
+    $("#weatherIcon").textContent="📅";
+    $("#weatherTitle").textContent="まだ予報期間外";
+    $("#weatherPlace").textContent="16日以内になると表示できるよ";
+    $("#weatherTemps").textContent="--° / --°";
+    $("#weatherRain").textContent="☔ --%";
+    $("#weatherSunset").textContent=`🌇 ${state.sunsetTime||"--:--"}`;
+    return;
+  }
+
+  // Avoid needless reloads unless user asked for refresh.
+  if(!force && state.weather?.date===selectedDate){
+    renderWeather();
+    return;
+  }
+
+  renderWeather();
+
+  if(!navigator.geolocation){
+    $("#weatherCard")?.classList.remove("weatherLoading");
+    $("#weatherTitle").textContent="位置情報を使えません";
+    $("#weatherPlace").textContent="この端末では現在地を取得できません";
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      fetchWeatherAt(pos.coords.latitude,pos.coords.longitude).catch(()=>{
+        $("#weatherCard")?.classList.remove("weatherLoading");
+        $("#weatherTitle").textContent="天気を取得できなかったよ";
+        $("#weatherPlace").textContent="↻ 更新でもう一度試せるよ";
+      });
+    },
+    ()=>{
+      $("#weatherCard")?.classList.remove("weatherLoading");
+      $("#weatherIcon").textContent="📍";
+      $("#weatherTitle").textContent="位置情報を許可すると表示";
+      $("#weatherPlace").textContent="Safariの位置情報をONにしてね";
+      $("#weatherTemps").textContent="--° / --°";
+      $("#weatherRain").textContent="☔ --%";
+    },
+    {enableHighAccuracy:false,timeout:7000,maximumAge:600000}
+  );
+}
+
+function deg2rad(d){return d*Math.PI/180}
+function rad2deg(r){return r*180/Math.PI}
+function normalize360(x){x%=360;if(x<0)x+=360;return x}
+
+// NOAA-style sunset approximation, good enough for scheduling.
+function calcSunsetLocal(dateStr,lat,lon){
+  const d=parseDate(dateStr);
+  const start=new Date(d.getFullYear(),0,0);
+  const N=Math.floor((d-start)/86400000);
+  const lngHour=lon/15;
+  const t=N+((18-lngHour)/24);
+  const M=(0.9856*t)-3.289;
+  let L=M+(1.916*Math.sin(deg2rad(M)))+(0.020*Math.sin(deg2rad(2*M)))+282.634;
+  L=normalize360(L);
+  let RA=rad2deg(Math.atan(0.91764*Math.tan(deg2rad(L))));
+  RA=normalize360(RA);
+  const Lq=Math.floor(L/90)*90, RAq=Math.floor(RA/90)*90;
+  RA=RA+(Lq-RAq); RA/=15;
+  const sinDec=0.39782*Math.sin(deg2rad(L));
+  const cosDec=Math.cos(Math.asin(sinDec));
+  const cosH=(Math.cos(deg2rad(90.833))-(sinDec*Math.sin(deg2rad(lat))))/(cosDec*Math.cos(deg2rad(lat)));
+  if(cosH>1 || cosH<-1) return null;
+  let H=rad2deg(Math.acos(cosH)); H/=15;
+  const T=H+RA-(0.06571*t)-6.622;
+  let UT=T-lngHour; while(UT<0)UT+=24; while(UT>=24)UT-=24;
+
+  // Convert UTC decimal hour to local using the selected date's device offset.
+  const offsetHours=-d.getTimezoneOffset()/60;
+  let local=UT+offsetHours; while(local<0)local+=24; while(local>=24)local-=24;
+  const hh=Math.floor(local), mm=Math.round((local-hh)*60);
+  const outH=(hh+(mm===60?1:0))%24, outM=mm===60?0:mm;
+  return `${pad(outH)}:${pad(outM)}`;
+}
+
+function renderSunsetInfo(){
+  const walk=state.tasks?.find(t=>t.walk);
+  const box=$("#sunsetInfo");
+  if(!box)return;
+  box.style.display=walk?.selected?"block":"none";
+  $("#sunsetTimeLabel").textContent=state.sunsetTime||"18:00";
+  $("#sunsetSource").textContent=state.sunsetAuto?"（位置情報から自動計算）":"（位置情報未使用時は18:00目安）";
+}
+
+function updateSunsetForSelectedDate(){
+  const walk=state.tasks?.find(t=>t.walk);
+  if(!walk?.selected){renderSunsetInfo();return;}
+  if(!navigator.geolocation){
+    state.sunsetTime=state.sunsetTime||"18:00";state.sunsetAuto=false;saveDay();renderSunsetInfo();return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const t=calcSunsetLocal(selectedDate,pos.coords.latitude,pos.coords.longitude);
+      if(t){state.sunsetTime=t;state.sunsetAuto=true;saveDay();}
+      renderSunsetInfo();
+    },
+    ()=>{
+      state.sunsetTime=state.sunsetTime||"18:00";state.sunsetAuto=false;saveDay();renderSunsetInfo();
+    },
+    {enableHighAccuracy:false,timeout:5000,maximumAge:86400000}
+  );
+}
+
 function buildSchedule(forceStart=null,fromNow=false){
   const wake=atDate($("#wakeTime").value),home=atDate($("#homeTime").value);
   if(!wake||!home){showStatus("時間を入れてね");return}
@@ -537,6 +789,22 @@ function buildSchedule(forceStart=null,fromNow=false){
 
   const fixed=()=>events.filter(e=>e.type==="shopping");
   const slots=milks.map(m=>({start:addMin(m,20),end:addMin(m,60),cursor:addMin(m,20)})).filter(s=>s.start<home);
+
+  // Walk: use the latest happy slot that still finishes before sunset (10 min buffer).
+  const walk=selected.find(t=>t.walk);
+  if(walk){
+    const sunset=atDate(state.sunsetTime||"18:00");
+    const deadline=sunset?addMin(sunset,-10):atDate("17:50");
+    let walkPlaced=false;
+    for(const s of [...slots].reverse()){
+      const st=new Date(s.cursor),en=addMin(st,walk.mins);
+      if(en>s.end||en>home||en>deadline)continue;
+      if(fixed().some(e=>overlaps(st,en,e.start,e.end)))continue;
+      events.push({type:"task",start:st,end:en,title:walk.name,sub:`日没前に ${walk.mins}分`});
+      s.cursor=en;scheduled.add(walk.id);walkPlaced=true;break;
+    }
+  }
+
   function place(t,late=false){
     for(const s of (late?[...slots].reverse():slots)){
       const st=new Date(s.cursor),en=addMin(st,t.mins);
@@ -547,8 +815,8 @@ function buildSchedule(forceStart=null,fromNow=false){
     }
     return false
   }
-  selected.filter(t=>!t.shopping&&!t.late).forEach(t=>place(t,false));
-  selected.filter(t=>!t.shopping&&t.late).forEach(t=>place(t,true));
+  selected.filter(t=>!t.shopping&&!t.walk&&!t.late).forEach(t=>place(t,false));
+  selected.filter(t=>!t.shopping&&!t.walk&&t.late).forEach(t=>place(t,true));
 
   selected.filter(t=>!scheduled.has(t.id)&&!t.shopping).forEach(t=>{
     events.push({type:"unscheduled",start:addMin(home,-1),end:home,title:t.name,sub:"ご機嫌タイムだけでは入りきらなかったよ"})
@@ -595,6 +863,7 @@ function renderSchedule(schedule){
 
 $("#selectedDate").addEventListener("change",e=>loadDay(e.target.value));
 $("#todayBtn").addEventListener("click",()=>loadDay(fmtDate(new Date())));
+$("#weatherRetry").addEventListener("click",()=>refreshWeatherForSelectedDate(true));
 ["wakeTime","homeTime","milkInterval","prepMins","shopMins"].forEach(id=>$("#"+id).addEventListener("change",saveDay));
 
 $("#wakeNow").addEventListener("click",()=>{
