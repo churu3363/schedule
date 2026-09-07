@@ -1,28 +1,27 @@
 # ベビの1日
 
-赤ちゃんが起きた時間を起点に、ミルク・おむつ・家事・買い物・夜ルーティンを組み立てるシンプルなWebアプリです。
+赤ちゃんが起きた時間を起点に、ミルク・おむつ・家事・買い物・夜ルーティンを組み立てるWebアプリです。
 
 ## GitHub Pagesで公開する方法
+1. GitHubで新しいRepositoryを作成
+2. このZIPを解凍
+3. 中のファイルを全部Repositoryの一番上にアップロード
+4. GitHubの **Settings → Pages**
+5. **Deploy from a branch** を選択
+6. Branchを **main**、Folderを **/(root)** にして保存
 
-1. GitHubで新しいRepositoryを作成します。
-2. このフォルダ内の `index.html`、`.nojekyll`、`README.md` をRepositoryの一番上にアップロードします。
-3. Repositoryの **Settings** → **Pages** を開きます。
-4. **Build and deployment** のSourceを **Deploy from a branch** にします。
-5. Branchを `main`、Folderを `/ (root)` にして保存します。
-6. 少しするとGitHub Pagesの公開URLが表示されます。
+## ホーム画面アイコンについて
+このプロジェクトには `icon.png` を同梱していて、`index.html` に以下を設定済みです。
+- favicon
+- apple-touch-icon
+- manifest.json
 
-## データ保存について
+そのため、GitHub Pagesで公開したあとに **Safariでサイトを開いて「共有」→「ホーム画面に追加」** をすると、
+この `icon.png` がホーム画面アイコンとして使われやすい構成になっています。
 
-日付ごとの予定、メモ、チェック状態、追加したタスクなどはブラウザの `localStorage` に保存されます。
+※ Shortcutsアプリで独自ショートカットを作る場合は、ショートカット側の仕様で手動アイコン設定になることがあります。
+※ 一番自然にこのアイコンを使うなら、Safariからの「ホーム画面に追加」がおすすめです。
 
-そのため、
-- 同じGitHub Pages URL・同じブラウザならデータは残ります。
-- 別の端末や別ブラウザには自動同期されません。
-- ブラウザデータを消すと保存内容が消える可能性があります。
-
-アプリ内の **バックアップ** でJSONを書き出し、**復元** で戻せます。
-
-## いまローカル版を使っている場合
-
-GitHub Pagesに移すと保存先のURLが変わるため、ローカル版の `localStorage` は自動では引き継がれません。
-移行前にローカル版でバックアップJSONを書き出し、GitHub Pages版を開いて復元してください。
+## データ保存
+予定、メモ、チェック状態、追加したタスクはブラウザのlocalStorageに保存されます。
+大事なデータはアプリ内の「バックアップ」でJSON保存しておくと安心です。

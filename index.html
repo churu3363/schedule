@@ -5,6 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#f7f3ee" />
 <title>ベビの1日</title>
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ベビの1日">
+
 <style>
 :root{
   --bg:#f7f3ee;
@@ -69,11 +76,12 @@ input[type=date]{
 }
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
 .fieldLabel{display:block;font-size:10px;color:var(--muted);font-weight:700;margin:0 0 6px 3px}
-input[type=time],input[type=number],input[type=text]{
+input[type=time],input[type=number],input[type=text],select{
   width:100%;border:1px solid var(--line);background:#fff;border-radius:15px;padding:11px 11px;
   font-size:15px;color:var(--ink);outline:none;-webkit-appearance:none;appearance:none
 }
-input[type=time]{min-height:44px}
+input[type=time],select{min-height:44px}
+select{-webkit-appearance:none;appearance:none}
 .info{
   margin-top:10px;padding:10px 12px;background:rgba(255,255,255,.55);
   border:1px solid rgba(233,214,206,.7);border-radius:14px;font-size:11px;line-height:1.6;color:#7a6e69
@@ -163,6 +171,32 @@ input[type=time]{min-height:44px}
 .backupHint{margin-top:9px;font-size:10px;color:var(--muted);line-height:1.6}
 input[type=file]{display:none}
 
+
+.sleepBtn{
+  width:100%;margin-top:12px;border:0;border-radius:18px;padding:15px 16px;
+  background:linear-gradient(135deg,var(--lav-soft),var(--sage-soft));
+  color:#5f635e;font-size:16px;font-weight:850;cursor:pointer;
+  box-shadow:0 7px 16px rgba(100,100,90,.08);
+}
+.sleepBtn:active{transform:scale(.99)}
+.celebration{
+  display:none;position:relative;margin-top:12px;padding:18px 42px 18px 16px;
+  border-radius:20px;background:linear-gradient(145deg,#fffaf6,var(--sage-soft));
+  border:1px solid #e3dfd5;box-shadow:0 10px 26px rgba(88,80,74,.08);
+  animation:popIn .22s ease-out;
+}
+.celebration.show{display:block}
+.celebrationTitle{font-size:16px;font-weight:900;margin-bottom:6px}
+.celebrationText{font-size:13px;line-height:1.7;color:#706b66}
+.celebrationClose{
+  position:absolute;right:10px;top:10px;width:28px;height:28px;border:0;border-radius:50%;
+  background:rgba(255,255,255,.72);color:#817b76;font-size:16px;cursor:pointer
+}
+@keyframes popIn{
+  from{opacity:0;transform:translateY(6px) scale(.985)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+
 .saved{margin-top:8px;text-align:right;font-size:10px;color:#9a948f}
 .status{
   position:sticky;bottom:12px;display:none;z-index:5;margin-top:14px;background:rgba(75,80,75,.94);
@@ -212,9 +246,21 @@ input[type=file]{display:none}
         <label class="fieldLabel">旦那さん帰宅</label>
         <input type="time" id="homeTime" value="19:00">
       </div>
+      <div>
+        <label class="fieldLabel">ミルク間隔</label>
+        <select id="milkInterval">
+          <option value="120">2時間</option>
+          <option value="150">2時間30分</option>
+          <option value="180" selected>3時間</option>
+          <option value="210">3時間30分</option>
+          <option value="240">4時間</option>
+          <option value="270">4時間30分</option>
+          <option value="300">5時間</option>
+        </select>
+      </div>
     </div>
     <div class="info">
-      起きた時間を最初のミルク開始として、約3時間ごとにミルクを組むよ。19時以降は家族の夜ルーティンに切り替え。
+      起きた時間を最初のミルク開始として、設定した間隔でミルクを組むよ。19時以降は家族の夜ルーティンに切り替え。
     </div>
   </div>
 
@@ -273,6 +319,15 @@ input[type=file]{display:none}
     <div class="actions">
       <button class="btn btnPrimary" id="rebuildNow">↻ 今から組み直す</button>
     </div>
+
+    <button class="sleepBtn" id="sleepNow">😴 寝た！</button>
+
+    <div class="celebration" id="celebration">
+      <button class="celebrationClose" id="celebrationClose" aria-label="閉じる">×</button>
+      <div class="celebrationTitle">今日も一日おつかれさま 🌙</div>
+      <div class="celebrationText" id="celebrationText"></div>
+    </div>
+
     <div class="saved" id="savedMark">自動保存</div>
   </div>
 
@@ -331,6 +386,8 @@ function allDays(){return JSON.parse(localStorage.getItem("babyPlannerDays")||"{
 function saveDays(x){localStorage.setItem("babyPlannerDays",JSON.stringify(x))}
 function globals(){return JSON.parse(localStorage.getItem("babyPlannerTaskDefaults")||"null")}
 function saveGlobals(x){localStorage.setItem("babyPlannerTaskDefaults",JSON.stringify(x))}
+function settings(){return JSON.parse(localStorage.getItem("babyPlannerSettings")||'{"milkIntervalMins":180}')}
+function saveSettings(x){localStorage.setItem("babyPlannerSettings",JSON.stringify(x))}
 
 function freshTasks(){
   const g=globals();
@@ -353,13 +410,14 @@ function defaultState(){
   const today=selectedDate===fmtDate(new Date());
   return {
     wakeTime:today?fmtTime(new Date()):"08:00",homeTime:"19:00",
-    prepMins:60,shopMins:60,tasks:freshTasks(),memos:carryMemos(selectedDate),schedule:[],doneMap:{}
+    milkIntervalMins:Number(settings().milkIntervalMins||180),
+    prepMins:60,shopMins:60,tasks:freshTasks(),memos:carryMemos(selectedDate),schedule:[],doneMap:{},sleepAt:null,sleepMessage:"",sleepCelebrationVisible:false
   }
 }
 function ensure(){
   state.tasks ||= freshTasks();state.memos ||= [{id:uid("memo"),text:"",checked:false}];
   state.schedule ||= [];state.doneMap ||= {};state.homeTime ||= "19:00";
-  state.prepMins ??=60;state.shopMins ??=60
+  state.prepMins ??=60;state.shopMins ??=60;state.milkIntervalMins ??=Number(settings().milkIntervalMins||180);state.sleepAt ??=null;state.sleepMessage ??="";state.sleepCelebrationVisible ??=false
 }
 function loadDay(s){
   selectedDate=s;const d=allDays();state=d[s]?JSON.parse(JSON.stringify(d[s])):defaultState();
@@ -367,16 +425,18 @@ function loadDay(s){
 }
 function saveDay(){
   state.wakeTime=$("#wakeTime").value;state.homeTime=$("#homeTime").value;
+  state.milkIntervalMins=Number($("#milkInterval").value||180);
   state.prepMins=Number($("#prepMins").value||60);state.shopMins=Number($("#shopMins").value||60);
   const d=allDays();d[selectedDate]=state;saveDays(d);
   saveGlobals(state.tasks);
+  saveSettings({milkIntervalMins:state.milkIntervalMins});
   $("#savedMark").textContent=`保存済み ・ ${new Date().toLocaleTimeString("ja-JP",{hour:"2-digit",minute:"2-digit"})}`
 }
 function renderAll(){
   $("#selectedDate").value=selectedDate;$("#scheduleDateLabel").textContent=humanDate(selectedDate);
-  $("#wakeTime").value=state.wakeTime||"";$("#homeTime").value=state.homeTime||"19:00";
+  $("#wakeTime").value=state.wakeTime||"";$("#homeTime").value=state.homeTime||"19:00";$("#milkInterval").value=String(state.milkIntervalMins||180);
   $("#prepMins").value=state.prepMins??60;$("#shopMins").value=state.shopMins??60;
-  renderTasks();renderMemos();renderSchedule(state.schedule||[])
+  renderTasks();renderMemos();renderSchedule(state.schedule||[]);renderCelebration()
 }
 
 function renderTasks(){
@@ -432,8 +492,9 @@ function renderMemos(focusId=null){
   })
 }
 
-function milkTimes(start,home){
-  const arr=[];for(let t=new Date(start);t<home;t=addMin(t,180))arr.push(new Date(t));return arr
+function milkTimes(start,home,intervalMins){
+  const interval=Math.max(60,Number(intervalMins||180));
+  const arr=[];for(let t=new Date(start);t<home;t=addMin(t,interval))arr.push(new Date(t));return arr
 }
 function ser(e){return {...e,start:e.start.toISOString(),end:e.end?e.end.toISOString():null}}
 function deser(e){return {...e,start:new Date(e.start),end:e.end?new Date(e.end):null}}
@@ -448,7 +509,7 @@ function buildSchedule(forceStart=null,fromNow=false){
   }
 
   const events=[],scheduled=new Set(),selected=state.tasks.filter(t=>t.selected);
-  const milks=milkTimes(start,home);
+  const milks=milkTimes(start,home,state.milkIntervalMins||180);
 
   events.push({type:"diaper",start:new Date(start),end:addMin(start,5),title:"🧷 おむつチェック",sub:"起きたタイミングで確認"});
   milks.forEach(m=>events.push({type:"milk",start:m,end:addMin(m,20),title:"🍼 ミルク",sub:"約20分・見守りタイム"}));
@@ -534,7 +595,7 @@ function renderSchedule(schedule){
 
 $("#selectedDate").addEventListener("change",e=>loadDay(e.target.value));
 $("#todayBtn").addEventListener("click",()=>loadDay(fmtDate(new Date())));
-["wakeTime","homeTime","prepMins","shopMins"].forEach(id=>$("#"+id).addEventListener("change",saveDay));
+["wakeTime","homeTime","milkInterval","prepMins","shopMins"].forEach(id=>$("#"+id).addEventListener("change",saveDay));
 
 $("#wakeNow").addEventListener("click",()=>{
   const now=new Date();
@@ -556,7 +617,8 @@ $("#backupBtn").addEventListener("click",()=>{
     version:1,
     exportedAt:new Date().toISOString(),
     days:allDays(),
-    taskDefaults:globals()
+    taskDefaults:globals(),
+    settings:settings()
   };
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
   const url=URL.createObjectURL(blob);
@@ -575,6 +637,7 @@ $("#restoreFile").addEventListener("change",e=>{
       if(data.app!=="baby-day-scheduler"||!data.days)throw new Error();
       saveDays(data.days);
       if(data.taskDefaults)saveGlobals(data.taskDefaults);
+      if(data.settings)saveSettings(data.settings);
       loadDay(selectedDate);
       showStatus("バックアップから復元したよ")
     }catch{
@@ -583,6 +646,39 @@ $("#restoreFile").addEventListener("change",e=>{
     e.target.value=""
   };
   reader.readAsText(file)
+});
+
+
+const ENCOURAGEMENTS=[
+  "今日もミルクもおむつも家のことも、ちゃんと一日まわしたね。あとはゆっくり休もう ☁️",
+  "予定どおりじゃない時間があっても大丈夫。今日を終えられた時点で十分すごいよ 🌿",
+  "今日もたくさん抱っこして、見守って、頑張ったね。夜くらいは自分にもやさしくしてね 🌙",
+  "一日おつかれさま。できたことを数えたら、きっと思ってるよりいっぱいあるよ 🫶",
+  "今日の分はここでおしまい。残ったことは明日の自分に任せて、今は休もう 😴",
+  "ベビもまゆも今日一日よく頑張った！あとはのんびり夜モードでOK 🌙"
+];
+
+function renderCelebration(){
+  const box=$("#celebration");
+  if(!box) return;
+  $("#celebrationText").textContent=state.sleepMessage||"今日も一日よく頑張ったね。あとはゆっくり休もう 🌙";
+  box.classList.toggle("show",!!state.sleepCelebrationVisible);
+}
+
+$("#sleepNow").addEventListener("click",()=>{
+  const now=new Date();
+  const msg=ENCOURAGEMENTS[Math.floor(Math.random()*ENCOURAGEMENTS.length)];
+  state.sleepAt=now.toISOString();
+  state.sleepMessage=msg;
+  state.sleepCelebrationVisible=true;
+  saveDay();
+  renderCelebration();
+});
+
+$("#celebrationClose").addEventListener("click",()=>{
+  state.sleepCelebrationVisible=false;
+  saveDay();
+  renderCelebration();
 });
 
 loadDay(selectedDate);
